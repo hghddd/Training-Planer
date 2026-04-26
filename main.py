@@ -22,7 +22,9 @@ class TrainingPlannerApp:
         self.entry_date.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
 
         tk.Label(self.frame_input, text="Тип тренировки:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
-        self.combo_type = ttk.Combobox(self.frame_input, values=["Бег", "Силовая", "Йога", "Плавание", "Другое"])
+        # Предопределенный список типов тренировок
+        self.training_types = ["Бег", "Силовая", "Йога", "Плавание", "Другое"]
+        self.combo_type = ttk.Combobox(self.frame_input, values=self.training_types)
         self.combo_type.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
 
         tk.Label(self.frame_input, text="Длительность (мин):").grid(row=2, column=0, padx=5, pady=5, sticky="w")
@@ -43,7 +45,9 @@ class TrainingPlannerApp:
         self.entry_filter_date.bind("<KeyRelease>", lambda event=None: self.filter_trainings()) # Фильтр при вводе
 
         tk.Label(self.frame_filter, text="По типу:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
-        self.combo_filter_type = ttk.Combobox(self.frame_filter, values=["Все", "Бег", "Силовая", "Йога", "Плавание", "Другое"])
+        # Добавляем "Все" для возможности сброса фильтра типа
+        filter_types = ["Все"] + self.training_types
+        self.combo_filter_type = ttk.Combobox(self.frame_filter, values=filter_types)
         self.combo_filter_type.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
         self.combo_filter_type.set("Все")
         self.combo_filter_type.bind("<<ComboboxSelected>>", lambda event=None: self.filter_trainings()) # Фильтр при выборе
@@ -63,14 +67,15 @@ class TrainingPlannerApp:
         self.tree.configure(yscroll=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        root.columnconfigure(1, weight=1) # Растягиваем колонку с таблицей
-        root.rowconfigure(0, weight=1) # Растягиваем строку с таблицей
+        # Конфигурация растягивания виджетов
+        root.columnconfigure(1, weight=1)
+        root.rowconfigure(0, weight=1)
 
         self.load_trainings() # Загрузка данных при старте
         self.update_table() # Первичное обновление таблицы
 
     def is_valid_date(self, date_str):
-        """Проверяет корректность формата даты."""
+        """Проверяет корректность формата даты (YYYY-MM-DD)."""
         try:
             datetime.strptime(date_str, "%Y-%m-%d")
             return True
@@ -86,10 +91,10 @@ class TrainingPlannerApp:
             return False
 
     def add_training(self):
-        """Добавляет новую тренировку в список и сохраняет данные."""
-        date = self.entry_date.get()
-        training_type = self.combo_type.get()
-        duration = self.entry_duration.get()
+        """Добавляет новую тренировку, проверяя корректность, и сохраняет данные."""
+        date = self.entry_date.get().strip()
+        training_type = self.combo_type.get().strip()
+        duration = self.entry_duration.get().strip()
 
         # Валидация ввода
         if not self.is_valid_date(date):
@@ -102,99 +107,88 @@ class TrainingPlannerApp:
             messagebox.showerror("Ошибка ввода", "Длительность должна быть положительным числом.")
             return
 
+        # Добавление новой тренировки
         self.trainings.append({"date": date, "type": training_type, "duration": int(duration)})
-        self.save_trainings()
-        self.update_table()
-        self.clear_input_fields()
+        self.save_trainings() # Сохранить данные после добавления
+        self.update_table()   # Обновить таблицу
+        self.clear_input_fields() # Очистить поля ввода
 
     def clear_input_fields(self):
-        """Очищает поля ввода после добавления тренировки."""
+        """Очищает поля ввода."""
         self.entry_date.delete(0, tk.END)
         self.combo_type.set("")
         self.entry_duration.delete(0, tk.END)
 
     def filter_trainings(self):
-        """Фильтрует тренировки по дате и типу."""
-        filter_date = self.entry_filter_date.get().lower()
-        filter_type = self.combo_filter_type.get().lower()
+        """Фильтрует записи по дате и типу."""
+        filter_date = self.entry_filter_date.get().strip().lower()
+        filter_type = self.combo_filter_type.get().strip().lower()
 
         filtered_list = []
         for training in self.trainings:
+            # Проверка соответствия дате (частичное совпадение)
             match_date = not filter_date or filter_date in training["date"].lower()
+            # Проверка соответствия типу (или "все")
             match_type = filter_type == "все" or filter_type == training["type"].lower()
 
             if match_date and match_type:
                 filtered_list.append(training)
-        self.update_table(filtered_list) # Обновляем таблицу отфильтрованными данными
+
+        self.update_table(filtered_list) # Обновляем таблицу с отфильтрованными данными
 
     def update_table(self, data=None):
-        """Обновляет отображение таблицы тренировок."""
-        # Очищаем текущие записи
+        """Обновляет таблицу с данными. Если 'data' предоставлена, используется она."""
+        # Очищаем существующие элементы таблицы
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-        # Опредеtree.insert("", tk.END, values=(training["date"], training["type"], training["duration"]))
+        # Определяем источник данных: либо отфильтрованные, tk.END, values=(training["date"], training["type"], training["duration"]))
 
     def save_trainings(self):
         """Сохраняет текущий список тренировок в JSON-файл."""
-        with open(self.file_path, 'w') as f:
-            json.dump(self.trainings, f, indent=4)
-
-        # --- Интеграция с Git ---
         try:
-            # Проверяем, инициализирован ли git
-            if not os.path.exists(".git"):
-                subprocess.run(["git", "init"], check=True, capture_output=True)
-
-            # Добавляем файл trainings.json и другие релевантные файлы
-            subprocess.run(["git", "add", self.file_path, "*.py", "README.md", ".gitignore"], check=True, capture_output=True)
-
-            # Делаем коммит, если есть изменения
-            status_result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
-            if status_result.stdout:], check=True, capture_output=True)
-        except FileNotFoundError:
-            print("Git не найден. Установите Git для использования этой функции.")
-        except subprocess.CalledProcessError as e:
-            print(f"Ошибка Git: {e.stderr.decode().strip()}")
+            with open(self.file_path, 'w', encoding='utf-8') as f:
+                json.dump(self.trainings, f, indent=4, ensure_ascii=False)
+            self.git_commit() # Автоматический коммит после сохранения
+        except IOError as e:
+            messagebox.showerror("Ошибка сохранения", f"Не удалось сохранить данные: {e}")
 
     def load_trainings(self):
-        """Загружает тренировки из JSON-файла."""
+        """Загружает тренировки из JSON-файла при запуске приложения."""
         if os.path.exists(self.file_path):
             try:
-                with open(self.file_path, 'r') as f:
+                with open(self.file_path, 'r', encoding='utf-8') as f:
                     self.trainings = json.load(f)
-            except json.JSONDecodeError:
-                self.trainings = [] # Если файл пустой или некорректен
+            except (json.JSONDecodeError, FileNotFoundError):
+                self.trainings = [] # Если файл пуст или некорректен, начинаем с пустого списка
+
+    def git_commit(self):
+        """Выполняет команды Git для добавления файла и коммита."""
+        try:
+            # Проверяем, инициализирован ли Git
+            if not os.path.exists(".git"):
+                subprocess.run(["git", "init"], check=True, capture_output=True, text=True)
+
+            # Добавляем файл данных и скрипт Python (если они изменились)
+            subprocess.run(["git", "add", self.file_path, os.path.basename(__file__)], check=True, capture_output=True, text=True)
+
+            # Создаем коммит с сообщением
+            commit_message = f"Update trainings data on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            subprocess.run(["git", "commit", "-m", commit_message], check=True, capture_output=True, text=True)
+            print(f"Git commit successful: '{commit_message}'")
+        except FileNotFoundError:
+            print("Git не найден. Пожалуйста, установите Git для использования автоматического коммита.")
+        except subprocess.CalledProcessError as e:
+            # Игнорируем ошибку, если нет изменений для коммита
+            if "nothing to commit" not in e.stderr.lower():
+                print(f"Ошибка Git: {e.stderr.strip()}")
+        except Exception as e:
+            print(f"Непредвиденная ошибка Git: {e}")
+
 
 if __name__ == "__main__":
-    # --- Создание .gitignore, если он не существует ---
-    if not os.path.exists(".gitignore"):
-        with open(".gitignore", "w") as f:
-            f.write("*.pyc\n__pycache__/\n")
-
-    # --- Создание README.md, если он не существует ---
-    if not os.path.exists("README.md"):
-        readme_content = """
-# Training Planner
-
-Приложение для планирования тренировок с сохранением данных в JSON и автоматическим Git-коммитом.
-
-**Основные функции:**
-- Добавление новых тренировок.
-- Валидация ввода даты и длительности.
-- Фильтрация по дате и типу тренировки.
-- Сохранение и загрузка данных в `trainings.json`.
-- Автоматический коммит изменений в Git при добавлении тренировки.
-
-**Установка и запуск:**
-1. Убедитесь, что у вас установлен Python и Git.
-2. Скачайте код `training_planner.py`.
-3. Запустите приложение: `python training_planner.py`
-"""
-        with open("README.md", "w", encoding="utf-8") as f:
-            f.write(readme_content)
-
     root = tk.Tk()
     app = TrainingPlannerApp(root)
     root.mainloop()
-    app.save_trainings() # Финальное сохранение при закрытии приложения
+    # Финальное сохранение при закрытии приложения
+    app.save_trainings()
